@@ -2,16 +2,18 @@ import express from 'express';
 import cors from 'cors';
 import ratelimit from 'express-rate-limit';
 import { pool } from './db.js';
+import transactionsRouter from './transactions.js';
 
 const app = express();
 app.use(ratelimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100 // limit each IP to 100 requests per windowMs
+  max: 1000 // limit each IP to 1000 requests per windowMs
 }));
 const PORT = process.env.PORT || 5000;
 
 app.use(cors({origin: 'http://localhost:4200'}));
 app.use(express.json());
+app.use('/api/transactions', transactionsRouter);
 
 
 // GET semua expense
