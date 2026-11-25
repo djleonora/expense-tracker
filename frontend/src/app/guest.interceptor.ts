@@ -14,8 +14,7 @@ export function getGuestId(): string {
 }
 
 export const guestInterceptor: HttpInterceptorFn = (req, next) => {
-  // Only the new routes need the guest headers. The old /api/expenses stays untouched.
-  if (!req.url.startsWith('/api/transactions')) {
+  if (!req.url.includes('/api/transactions')) {
     return next(req);
   }
 

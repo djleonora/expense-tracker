@@ -13,7 +13,7 @@ const CATEGORIES = ['food', 'transport', 'shopping', 'bills', 'health',
                     'entertainment', 'salary', 'gift', 'other'];
 
 const LIST_SQL = `
-  SELECT id, type, title, amount, category, date::text AS date
+  SELECT id, type, title, amount::float8 AS amount, category, date::text AS date
   FROM transactions
   WHERE guest_id = $1
   ORDER BY date DESC, created_at DESC`;
@@ -45,21 +45,22 @@ router.get('/', async (req, res, next) => {
   }
 });
 
-// POST /api/transactions
-router.post('/', async (req, res, next) => {
-  const { value, error } = parseBody(req.body);
-  if (error) return res.status(400).json({ error });
-
+router.post('/reset', async (req, res, next) => {
+  const client = await pool.connect();
+  let broken = false;
   try {
-    const { rows } = await pool.query(
-      `INSERT INTO transactions (guest_id, type, title, amount, category, date)
-       VALUES ($1, $2, $3, $4, $5, $6)
-       RETURNING id, type, title, amount, category, date::text AS date`,
-      [req.guestId, value.type, value.title, value.amount, value.category, req.localDate]
-    );
-    res.status(201).json(rows[0]);
+    await client.query('BEGIN');
+    await client.query('DELETE FROM transactions WHERE guest_id = $1', [req.guestId]);
+    await insertSeed(client, req.guestId, req.localDate);
+    const { rows } = await client.query(LIST_SQL, [req.guestId]);
+    await client.query('COMMIT');
+    res.json(rows);
   } catch (err) {
+    broken = true;
+    await client.query('ROLLBACK').catch(() => {});
     next(err);
+  } finally {
+    client.release(broken); // destroys a broken connection so the pool doesn't reuse it
   }
 });
 
@@ -76,7 +77,7 @@ router.patch('/:id', async (req, res, next) => {
       `UPDATE transactions
        SET type = $1, title = $2, amount = $3, category = $4
        WHERE id = $5 AND guest_id = $6
-       RETURNING id, type, title, amount, category, date::text AS date`,
+       RETURNING id, type, title, amount::float8 AS amount, category, date::text AS date`,
       [value.type, value.title, value.amount, value.category, req.params.id, req.guestId]
     );
     if (rows.length === 0) return res.status(404).json({ error: 'Not found.' });
