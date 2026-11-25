@@ -45,22 +45,21 @@ router.get('/', async (req, res, next) => {
   }
 });
 
-router.post('/reset', async (req, res, next) => {
-  const client = await pool.connect();
-  let broken = false;
+// POST /api/transactions
+router.post('/', async (req, res, next) => {
+  const { value, error } = parseBody(req.body);
+  if (error) return res.status(400).json({ error });
+
   try {
-    await client.query('BEGIN');
-    await client.query('DELETE FROM transactions WHERE guest_id = $1', [req.guestId]);
-    await insertSeed(client, req.guestId, req.localDate);
-    const { rows } = await client.query(LIST_SQL, [req.guestId]);
-    await client.query('COMMIT');
-    res.json(rows);
+    const { rows } = await pool.query(
+      `INSERT INTO transactions (guest_id, type, title, amount, category, date)
+       VALUES ($1, $2, $3, $4, $5, $6)
+       RETURNING id, type, title, amount::float8 AS amount, category, date::text AS date`,
+      [req.guestId, value.type, value.title, value.amount, value.category, req.localDate]
+    );
+    res.status(201).json(rows[0]);
   } catch (err) {
-    broken = true;
-    await client.query('ROLLBACK').catch(() => {});
     next(err);
-  } finally {
-    client.release(broken); // destroys a broken connection so the pool doesn't reuse it
   }
 });
 
