@@ -6,7 +6,7 @@ import { Transaction, TransactionInput } from './transaction.model';
 @Injectable({ providedIn: 'root' })
 export class TransactionService {
   private http = inject(HttpClient);
-  private readonly url = '/api/transactions';
+  private readonly url = 'https://expense-tracker-psi-snowy-40.vercel.app/api/transactions';
 
   list(): Observable<Transaction[]> {
     return this.http.get<Transaction[]>(this.url);
